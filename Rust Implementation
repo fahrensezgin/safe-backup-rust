@@ -1,0 +1,65 @@
+use std::io::{self, Write};
+use std::fs;
+use std::path::Path;
+
+fn main() {
+    let mut logfile = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("logfile.txt").expect("Log file error");
+
+    println!("Please enter your file name:");
+    let mut filename = String::new();
+    io::stdin().read_line(&mut filename).expect("Read error");
+    let filename = filename.trim();
+
+    println!("Please enter your command (backup, restore, delete):");
+    let mut command = String::new();
+    io::stdin().read_line(&mut command).expect("Read error");
+    let command = command.trim();
+
+    let result = match command {
+        "backup" => backup_file(filename),
+        "restore" => restore_file(filename),
+        "delete" => delete_file(filename),
+        _ => Err("Unknown command.".to_string()),
+    };
+
+    match result {
+        Ok(msg) => {
+            println!("Operation completed: {}", msg);
+            writeln!(logfile, "[SUCCESS] {} -- {}", command, filename).unwrap();
+        }
+        Err(e) => {
+            println!("Error: {}", e);
+            writeln!(logfile, "[ERROR] {} -- {} -- {}", command, filename, e).unwrap();
+        }
+    }
+}
+
+fn backup_file(file: &str) -> Result<String, String> {
+    if !Path::new(file).is_file() {
+        return Err("Source file does not exist".into());
+    }
+    let backup_name = format!("{}.bak", file);
+    fs::copy(file, &backup_name)
+        .map_err(|_| "Failed to create backup".to_string())?;
+    Ok(format!("backup {} -> {}", file, backup_name))
+}
+
+fn restore_file(file: &str) -> Result<String, String> {
+    let bak_name = format!("{}.bak", file);
+    if !Path::new(&bak_name).is_file() {
+        return Err("Backup file does not exist".into());
+    }
+    fs::copy(&bak_name, file).map_err(|_| "Restore failed".to_string())?;
+    Ok(format!("restore {} <- {}", file, bak_name))
+}
+
+fn delete_file(file: &str) -> Result<String, String> {
+    if !Path::new(file).is_file() {
+        return Err("File does not exist".into());
+    }
+    fs::remove_file(file).map_err(|_| "Delete failed".to_string())?;
+    Ok(format!("deleted {}", file))
+}
